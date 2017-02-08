@@ -22,7 +22,8 @@ The goals / steps of this project are the following:
 [pipeline]: ./output_images/pipeline.jpg "Binary Example"
 [warp]: ./output_images/warped_img.jpg "Warp Example"
 [pipeline_warp]: ./output_images/pipline_and_warp.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
+[slidding_windows]: ./output_images/slidding_windows.jpg "Output"
+[fitted_lanes]: ./output_images/fitted_lanes.jpg "Output"
 [video1]: ./project_video.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
@@ -148,12 +149,52 @@ def birdeye(img):
 I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
 ![alt text][warp]
 
+The following figures show the perspective tranform on the road image togehter with the binary image from the thresholding pipeline.
 ![alt text][pipeline_warp]
 
 
 ####4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
+I first identify the potential lane pixels from the thresholded binary image. If no prior lane has been detected for the last 20 frames, I will the slidding window method to find the lane pixels, otherwise I will use the pixels withing a certain margin from the previous best fitted lanes as the potential lane pixels.
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+The sliding window method is implemented in the function `find_lane_pixels_with_window_centroids()` the 14th code cell in the Jupyter notebook "lane-tracking.ipynb". I first find the starting point of the lanes by convolve the histogram of the bottom third of the binary image with a convolution window of certain size adn identify the two peaks on the left and the right of the midpoint.
+
+```python
+    l_sum = np.sum(binary_warped[top:,:mid], axis=0)
+    r_sum = np.sum(binary_warped[top:,mid:], axis=0)
+
+    l_center = np.argmax(np.convolve(window,l_sum))-window_width/2
+    r_center = np.argmax(np.convolve(window,r_sum))-window_width/2+mid
+```
+I will then iteratively find the centroids of all points within a window of certain size centering around the previous centroid, and update the new centroid accordingly.
+
+```python
+     for level in range(1,img_height//window_height):
+       # convolve the window into the vertical slice of the image
+        image_layer = np.sum(binary_warped[img_height-(level+1)*window_height:img_height-level*window_height], axis=0)
+        conv_signal = np.convolve(window, image_layer)
+        
+        # Find the best left centroid by using past left center as a reference
+        # Use window_width/2 as offset because convolution signal reference is at right side of window, not center of window
+        offset = window_width/2
+        l_min_index = int(max(l_center+offset-margin,0))
+        l_max_index = int(min(l_center+offset+margin,img_width))
+        if np.max(conv_signal[l_min_index:l_max_index]) > 30:
+            l_center = np.argmax(conv_signal[l_min_index:l_max_index])+l_min_index-offset
+        
+        # Find the best right centroid by using past right center as a reference
+        r_min_index = int(max(r_center+offset-margin,0))
+        r_max_index = int(min(r_center+offset+margin,img_width))
+        if np.max(conv_signal[r_min_index:r_max_index]) > 30:
+            r_center = np.argmax(conv_signal[r_min_index:r_max_index])+r_min_index-offset
+```
+
+If lanes have been detected in the previous frame, I will use them as reference to simplify the search for lane pixels. This method is implemented in the function `find_lane_pixels_with_previous_fit()`. This function basically finds all the non-zero pixel in the binary image within a certain margin from the previous fitted lanes.
+
+After obtaining the potential lane pixels, I used regression to fit a quadratic curve to the pixels. Instead of fitting 2 curves separately, I made use of the prior knowledge that the lanes are almost parallel to each other and estimate them together, i.e. constraining the quadratic and the linear coefficients to be them same, only allowing for the intercept to changes between the two curve.
+
+The fitting is implemented in the function `fit_lane()` in the 15th code cell of the Jupyter notebook "lane-tracking.ipynb".
+
+![slidding windows][slidding_windows]
 
 ![alt text][image5]
 
