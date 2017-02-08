@@ -22,10 +22,11 @@ The goals / steps of this project are the following:
 [pipeline]: ./output_images/pipeline.jpg "Binary Example"
 [warp]: ./output_images/warped_img.jpg "Warp Example"
 [pipeline_warp]: ./output_images/pipline_and_warp.jpg "Fit Visual"
-[slidding_windows]: ./output_images/slidding_windows.jpg "Output"
-[fitted_lanes]: ./output_images/fitted_lanes.jpg "Output"
-[output]: ./output_images/output.jpg "Output"
+[slidding_windows]: ./output_images/slidding_windows.jpg "Sliding window"
+[fitted_lanes]: ./output_images/fitted_lanes.jpg "Fitted lanes"
+[output]: ./output_images/output.jpg "Fit Visual"
 [video1]: ./project_video.mp4 "Video"
+
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 ###Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
@@ -40,7 +41,7 @@ You're reading it!
 
 ####1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
 
-The code for this step is contained in the second code cell of the IPython notebook located in "lane-tracking.ipynb".  
+The code for this step is contained in the second code cell of the IPython notebook named "lane-tracking.ipynb".  
 I start by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image.  Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image.  `imgpoints` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.  
 I then used the output `objpoints` and `imgpoints` to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` function.  
 ```python
@@ -58,24 +59,26 @@ for i in tqdm(range(len(img_list))):
 # Calcualte the undistortion matrix 
 ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape, None,None)
 ```
-I define a function to correct for distortion using the above calibration results and the function `cv2.undistort()`
+I defined a function to correct for distortion using `cv2.undistort()` with the above calibration results. 
 ```python
 # define a function that will correct for distortion an arbitrary image
 def undistort(img):
     return cv2.undistort(img, mtx, dist, None, mtx)
 ```
-I apply this distortion correction to the test image obtained this result: 
+I applied this distortion correction to the chessboard images and obtained this result: 
 
 ![Chessboards][undistorted_chessboards]
 
 ###Pipeline (single images)
 
 ####1. Provide an example of a distortion-corrected image.
-I apply the same distortion correction above on the road images from the test folder and obtain results in the following figure.
+I appled the same distortion correction as above on the road images from the test folder and obtained the results in the following figure.
+
 ![Distortion correction roads][undistorted_roads]
+
 ####2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
-I used a combination of color and gradient thresholds to generate a binary image, The implementation is coded in the function `pipeline()` in the 7th code cell in the Jupyter notebook "lane-tracking.ipynb".
+I used a combination of color and gradient thresholds to generate the binary images. The implementation is coded in the function `pipeline()` in the 7th code cell of the Jupyter notebook "lane-tracking.ipynb".
 
 ```python
 def pipeline(img, sx_thresh=30, sl_thresh=200, suv_thresh = 100):
@@ -101,18 +104,18 @@ def pipeline(img, sx_thresh=30, sl_thresh=200, suv_thresh = 100):
     color_binary = np.dstack((mask_yellow, mask_white, mask_sx))
     return color_binary
 ```
-I used UV channel from YUV color space, the L channel from HLS color space and the gradient in the x-direction to create the thresholded binary image.
+I used the UV channel from YUV color space, the L channel from HLS color space and the gradient in lightness along the x-direction to create the thresholded binary image.
 
-The choice of the color space is the result of a long process of trials and errors. The UV channel performs very well in detecting yellow. The L channel is very robust in detecting white. I use these two channels instead of the saturation (S from HLS) because, even though S is very good in detecting both white and yellow, it underperforms in each of the two colors compared to each of the aforementioned color channel, especially when the road is overexposed to sunlight. The Sobel X transform is used to make sure the pipeline detecting edges even when there are shadows that may change the shades of yellow and white of the lane marks.
+The above choice of the color space is the result of a long process of trials and errors. The UV channel performs very well at detecting yellow. The L channel is very robust in detecting white. I use these two channels instead of the saturation (S from HLS) suggested in the lecture because, even though S is very good in detecting both white and yellow, it underperforms in detecting yellow compared to UV, and in detecting white compared to L, especially when the road is overexposed to sunlight. The Sobel X transform is used to make sure the pipeline able to detect edges even when there are shadows that may change the shades of yellow and white of the lane marks.
 
 I also apply Gaussian blur to the bottom half of the image to reduce noise, and apply local brightness historam equalization to the lightness channel to enhance constrast. 
 
-The following figure show the result of the pipeline, together with the immediate steps (color/gradient transformation and thresholding)
+The following figure shows the result of the pipeline, together with the output from intermediate steps (color/gradient transformation and thresholding)
 ![Pipeline][pipeline]
 
 ####3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-The code for my perspective transform includes a function called `birdeye()`, which appears in the 9th code ceell in the file `lane-tracking.ipynb`.  To define the function `birdeye`, I precomputed the perstective transformation matrix using the  source (`src`) and destination (`dst`) points.  For the project video, I chose the hardcode the source and destination points in the following manner:
+The code for the perspective transform includes a function called `birdeye()`, which appears in the 9th code cell in the file `lane-tracking.ipynb`.  To define the function `birdeye()`, I precomputed the perspective transform matrix using the  source (`src`) and destination (`dst`) points.  For the project video, I chose the hardcode the source and destination points in the following manner:
 
 ```python
 src = np.float32(
@@ -142,7 +145,7 @@ I then precomputed the transformation matrices (the computation is in the same c
 M = cv2.getPerspectiveTransform(source_points, warped_points)
 Minv = cv2.getPerspectiveTransform(warped_points, source_points)
 ```
-Precomputation avaoid repeated call to the `cv2.getPerspectiveTransform()`, as I will assume that the road is will be the same plane throughout the video and hence the perspective transformation will not change over time. Using this precomputed transformation, I define the `birdeye()` function (in the same code cell) that take in a road image and output the corresponding bird eye view of the road.
+Precomputation avoids me of the need to repeatedly call `cv2.getPerspectiveTransform()` for transformation matrices, as I will assume that the road will be on the same plane throughout the video and hence the perspective transform will not change over time. Using this precomputed transformation, I defined the `birdeye()` function (in the same code cell) that took in a road image and outputed the corresponding bird eye view of the road.
 ```python
 def birdeye(img):
     return cv2.warpPerspective(img, M, img.shape[:2][::-1], flags=cv2.INTER_CUBIC)
@@ -155,9 +158,9 @@ The following figures show the perspective tranform on the road image togehter w
 
 
 ####4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
-I first identify the potential lane pixels from the thresholded binary image. If no prior lane has been detected for the last 20 frames, I will the slidding window method to find the lane pixels, otherwise I will use the pixels withing a certain margin from the previous best fitted lanes as the potential lane pixels.
+I first identified the potential lane pixels from the thresholded binary image by one of the two following methods. If no prior lane has been detected for the last 20 frames, I will use a series of slidding windows to find the lane pixels, otherwise I will use the pixels within a certain margin from the previous best fitted lanes as the potential lane pixels.
 
-The sliding window method is implemented in the function `find_lane_pixels_with_window_centroids()` the 14th code cell in the Jupyter notebook "lane-tracking.ipynb". I first find the starting point of the lanes by convolve the histogram of the bottom third of the binary image with a convolution window of certain size adn identify the two peaks on the left and the right of the midpoint.
+The sliding window method is implemented in the function `find_lane_pixels_with_window_centroids()` the 14th code cell in the Jupyter notebook "lane-tracking.ipynb". I first looked for the starting point of the lanes by applying convolution over the histogram of the bottom third of the binary image to identify the two peaks on the left and the right sides of the image.
 
 ```python
     l_sum = np.sum(binary_warped[top:,:mid], axis=0)
@@ -166,7 +169,7 @@ The sliding window method is implemented in the function `find_lane_pixels_with_
     l_center = np.argmax(np.convolve(window,l_sum))-window_width/2
     r_center = np.argmax(np.convolve(window,r_sum))-window_width/2+mid
 ```
-I will then iteratively find the centroids of all points within a window of certain size centering around the previous centroid, and update the new centroid accordingly.
+I would then iteratively look for the centroids of all points within a window of certain size centering around the previous centroid, and update the new centroids accordingly.
 
 ```python
      for level in range(1,img_height//window_height):
@@ -189,9 +192,9 @@ I will then iteratively find the centroids of all points within a window of cert
             r_center = np.argmax(conv_signal[r_min_index:r_max_index])+r_min_index-offset
 ```
 
-If lanes have been detected in the previous frame, I will use them as reference to simplify the search for lane pixels. This method is implemented in the function `find_lane_pixels_with_previous_fit()`. This function basically finds all the non-zero pixel in the binary image within a certain margin from the previous fitted lanes.
+If lanes had been detected in the previous frame, I would use them as reference to simplify the search for lane pixels. This method is implemented in the function `find_lane_pixels_with_previous_fit()`. This function basically looked for all the non-zero pixel in the binary image within a certain margin from the given fitted lines.
 
-After obtaining the potential lane pixels, I used regression to fit a quadratic curve to the pixels. Instead of fitting 2 curves separately, I made use of the prior knowledge that the lanes are almost parallel to each other and estimate them together, i.e. constraining the quadratic and the linear coefficients to be them same, only allowing for the intercept to changes between the two curve.
+After obtaining the potential lane pixels, I used regression to fit a quadratic curve to the pixels. Instead of fitting 2 curves separately, I made use of the prior knowledge that the lanes are almost parallel to each other and estimate them together, constraining the quadratic and the linear coefficients to be them same, only allowing for the intercept to changes between the two curve.
 
 The fitting is implemented in the function `fit_lane()` in the 15th code cell of the Jupyter notebook "lane-tracking.ipynb".
 ```python
@@ -234,9 +237,9 @@ The result from the slidding window method and from the using previous fitted li
 
 ####5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-First, I mannually meaure the width of the lanes in pixels, and the number of dash lines and gap in the birdeye view image. Base on those numbers I calculated the scaling factor (meter per each pixel) as `ym_per_pix = 3*17/720` and `xm_per_pix = 3.7/(960-320)`
+First, I mannually measured the width of the lanes in pixels, and the number of dash lines and gaps between them in the birdeye view of the road. Base on these numbers I calculated the scaling factor `ym_per_pix = 3*17/720` and `xm_per_pix = 3.7/(960-320)` to convert all coordinates from pixels to meters.
 
-The calculation for the radius of curvation is done in the 21st code cell in the Jupyter notebook "lane-tracking.ipynb". As the pixels obtained from the top half are often noisy, I only used the bottom half of the line to calculate the lane curvature.
+The calculation for the radius of curvation is done in the 21st code cell of the Jupyter notebook "lane-tracking.ipynb". As the pixels obtained from the top half are often noisy, I only used the bottom part of the image for this calculation.
 
 ```python
 def radius_of_curvature(fity, fitx):
@@ -249,7 +252,7 @@ def radius_of_curvature(fity, fitx):
 
 ####6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in the 21st code cell in the Jupyter notebook "lane-tracking.ipynb" in the function `stitch()`. This function draw the fitted lanes and the lane pixels in the birdeye onto a blank image `color_warp`, and warp it back to the normal view and overlay it onto the orignal image (after distortion correction). The main logic of the function is implemented as follows:
+I implemented this step in the 21st code cell in the Jupyter notebook "lane-tracking.ipynb" in the function `stitch()`. This function draw the fitted lanes and the lane pixels in the birdeye onto a blank image `color_warp`, then warp it back to the normal view, and finally, overlay it onto the orignal image. The main logic of the function is implemented as follows:
 
 ```python
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
@@ -270,7 +273,12 @@ This function also draws the output from the intermediate steps of the pipeline 
 
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](http://www.youtube.com/watch?v=F8pqSywS6Iw)
+
+[![Video](http://img.youtube.com/vi/F8pqSywS6Iw/0.jpg)](http://www.youtube.com/watch?v=F8pqSywS6Iw "Video Title")
+
+Here is the result on the challenge video
+[![Video](http://img.youtube.com/vi/vBnTaBC2iJU/0.jpg)](http://www.youtube.com/watch?v=vBnTaBC2iJU "Video Title")
 
 ---
 
