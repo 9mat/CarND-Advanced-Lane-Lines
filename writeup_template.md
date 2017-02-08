@@ -1,5 +1,4 @@
-##Writeup Template
-###You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
+##Writeup
 
 ---
 
@@ -18,12 +17,13 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[image1]: ./examples/undistort_output.png "Undistorted"
-[image2]: ./test_images/test1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
-[image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
+[undistorted_chessboards]: ./output_images/undistorted_chessboards.jpg "Undistorted"
+[undistorted_roads]: ./output_images/undistorted_imgs.jpg "Road Transformed"
+[pipeline]: ./output_images/pipeline.jpg "Binary Example"
+[warp]: ./output_images/warped_img.jpg "Warp Example"
+[pipeline_warp]: ./output_images/pipline_and_warp.jpg "Fit Visual"
+[slidding_windows]: ./output_images/slidding_windows.jpg "Output"
+[fitted_lanes]: ./output_images/fitted_lanes.jpg "Output"
 [video1]: ./project_video.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
@@ -39,34 +39,86 @@ You're reading it!
 
 ####1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
 
-The code for this step is contained in the first code cell of the IPython notebook located in "./examples/example.ipynb" (or in lines # through # of the file called `some_file.py`).  
-
+The code for this step is contained in the second code cell of the IPython notebook located in "lane-tracking.ipynb".  
 I start by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image.  Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image.  `imgpoints` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.  
+I then used the output `objpoints` and `imgpoints` to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` function.  
+```python
+# Find chessboard corners and append to the list when possible
+for i in tqdm(range(len(img_list))):
+    img = cv2.imread(img_list[i])
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)            
+    ret, corners = cv2.findChessboardCorners(gray, (nx, ny), None)
+    
+    # if found the corners, add them to the list 
+    if ret:
+        imgpoints.append(corners)
+        objpoints.append(objp)
+    
+# Calcualte the undistortion matrix 
+ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape, None,None)
+```
+I define a function to correct for distortion using the above calibration results and the function `cv2.undistort()`
+```python
+# define a function that will correct for distortion an arbitrary image
+def undistort(img):
+    return cv2.undistort(img, mtx, dist, None, mtx)
+```
+I apply this distortion correction to the test image obtained this result: 
 
-I then used the output `objpoints` and `imgpoints` to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` function.  I applied this distortion correction to the test image using the `cv2.undistort()` function and obtained this result: 
-
-![alt text][image1]
+![Chessboards][undistorted_chessboards]
 
 ###Pipeline (single images)
 
 ####1. Provide an example of a distortion-corrected image.
-To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
-![alt text][image2]
+I apply the same distortion correction above on the road images from the test folder and obtain results in the following figure.
+![Distortion correction roads][undistorted_roads]
 ####2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
 
-![alt text][image3]
+I used a combination of color and gradient thresholds to generate a binary image, The implementation is coded in the function `pipeline()` in the 7th code cell in the Jupyter notebook "lane-tracking.ipynb".
+
+```python
+def pipeline(img, sx_thresh=30, sl_thresh=200, suv_thresh = 100):
+    # Apply gaussian blur to reduce noise
+    img = gaussian_blur(img)
+
+    # Convert to YUV and use U and V to detect yellow
+    y,u,v = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2YUV))
+    uv = np.abs(u.astype(np.int32) - v.astype(np.int32))*3
+    
+    # Convert to HSL and use L to detect white
+    h,l,s = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HLS))
+    l = clahe.apply(l)
+    
+    # Gradient
+    sobelx = np.absolute(cv2.Sobel(l, cv2.CV_64F, 1, 0, ksize=3)) # Take the derivative in x
+    
+    mask_sx = scaled(sobelx) > sx_thresh
+    mask_white = (l>sl_thresh)
+    mask_yellow = (uv>suv_thresh)
+    
+    # Stack all 3 thresholds together
+    color_binary = np.dstack((mask_yellow, mask_white, mask_sx))
+    return color_binary
+```
+I used UV channel from YUV color space, the L channel from HLS color space and the gradient in the x-direction to create the thresholded binary image.
+
+The choice of the color space is the result of a long process of trials and errors. The UV channel performs very well in detecting yellow. The L channel is very robust in detecting white. I use these two channels instead of the saturation (S from HLS) because, even though S is very good in detecting both white and yellow, it underperforms in each of the two colors compared to each of the aforementioned color channel, especially when the road is overexposed to sunlight. The Sobel X transform is used to make sure the pipeline detecting edges even when there are shadows that may change the shades of yellow and white of the lane marks.
+
+I also apply Gaussian blur to the bottom half of the image to reduce noise, and apply local brightness historam equalization to the lightness channel to enhance constrast. 
+
+The following figure show the result of the pipeline, together with the immediate steps (color/gradient transformation and thresholding)
+![Pipeline][pipeline]
 
 ####3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
+The code for my perspective transform includes a function called `birdeye()`, which appears in the 9th code ceell in the file `lane-tracking.ipynb`.  To define the function `birdeye`, I precomputed the perstective transformation matrix using the  source (`src`) and destination (`dst`) points.  For the project video, I chose the hardcode the source and destination points in the following manner:
 
-```
+```python
 src = np.float32(
-    [[(img_size[0] / 2) - 55, img_size[1] / 2 + 100],
+    [[(img_size[0] / 2) - 32, img_size[1] / 2 + 80],
     [((img_size[0] / 6) - 10), img_size[1]],
     [(img_size[0] * 5 / 6) + 60, img_size[1]],
-    [(img_size[0] / 2 + 55), img_size[1] / 2 + 100]])
+    [(img_size[0] / 2 + 32), img_size[1] / 2 + 80]])
 dst = np.float32(
     [[(img_size[0] / 4), 0],
     [(img_size[0] / 4), img_size[1]],
@@ -76,20 +128,73 @@ dst = np.float32(
 ```
 This resulted in the following source and destination points:
 
-| Source        | Destination   | 
-|:-------------:|:-------------:| 
-| 585, 460      | 320, 0        | 
-| 203, 720      | 320, 720      |
-| 1127, 720     | 960, 720      |
-| 695, 460      | 960, 0        |
+| Source         | Destination   | 
+|:--------------:|:-------------:| 
+|  605, 440      | 320, 0        | 
+|  203, 720      | 320, 720      |
+| 1127, 720      | 960, 720      |
+|  675, 440      | 960, 0        |
 
+I then precomputed the transformation matrices (the computation is in the same code cell) using `cv2.getPerspectiveTransform()` function
+
+```python
+M = cv2.getPerspectiveTransform(source_points, warped_points)
+Minv = cv2.getPerspectiveTransform(warped_points, source_points)
+```
+Precomputation avaoid repeated call to the `cv2.getPerspectiveTransform()`, as I will assume that the road is will be the same plane throughout the video and hence the perspective transformation will not change over time. Using this precomputed transformation, I define the `birdeye()` function (in the same code cell) that take in a road image and output the corresponding bird eye view of the road.
+```python
+def birdeye(img):
+    return cv2.warpPerspective(img, M, img.shape[:2][::-1], flags=cv2.INTER_CUBIC)
+```
 I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
+![alt text][warp]
 
-![alt text][image4]
+The following figures show the perspective tranform on the road image togehter with the binary image from the thresholding pipeline.
+![alt text][pipeline_warp]
+
 
 ####4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
+I first identify the potential lane pixels from the thresholded binary image. If no prior lane has been detected for the last 20 frames, I will the slidding window method to find the lane pixels, otherwise I will use the pixels withing a certain margin from the previous best fitted lanes as the potential lane pixels.
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+The sliding window method is implemented in the function `find_lane_pixels_with_window_centroids()` the 14th code cell in the Jupyter notebook "lane-tracking.ipynb". I first find the starting point of the lanes by convolve the histogram of the bottom third of the binary image with a convolution window of certain size adn identify the two peaks on the left and the right of the midpoint.
+
+```python
+    l_sum = np.sum(binary_warped[top:,:mid], axis=0)
+    r_sum = np.sum(binary_warped[top:,mid:], axis=0)
+
+    l_center = np.argmax(np.convolve(window,l_sum))-window_width/2
+    r_center = np.argmax(np.convolve(window,r_sum))-window_width/2+mid
+```
+I will then iteratively find the centroids of all points within a window of certain size centering around the previous centroid, and update the new centroid accordingly.
+
+```python
+     for level in range(1,img_height//window_height):
+       # convolve the window into the vertical slice of the image
+        image_layer = np.sum(binary_warped[img_height-(level+1)*window_height:img_height-level*window_height], axis=0)
+        conv_signal = np.convolve(window, image_layer)
+        
+        # Find the best left centroid by using past left center as a reference
+        # Use window_width/2 as offset because convolution signal reference is at right side of window, not center of window
+        offset = window_width/2
+        l_min_index = int(max(l_center+offset-margin,0))
+        l_max_index = int(min(l_center+offset+margin,img_width))
+        if np.max(conv_signal[l_min_index:l_max_index]) > 30:
+            l_center = np.argmax(conv_signal[l_min_index:l_max_index])+l_min_index-offset
+        
+        # Find the best right centroid by using past right center as a reference
+        r_min_index = int(max(r_center+offset-margin,0))
+        r_max_index = int(min(r_center+offset+margin,img_width))
+        if np.max(conv_signal[r_min_index:r_max_index]) > 30:
+            r_center = np.argmax(conv_signal[r_min_index:r_max_index])+r_min_index-offset
+```
+
+If lanes have been detected in the previous frame, I will use them as reference to simplify the search for lane pixels. This method is implemented in the function `find_lane_pixels_with_previous_fit()`. This function basically finds all the non-zero pixel in the binary image within a certain margin from the previous fitted lanes.
+
+After obtaining the potential lane pixels, I used regression to fit a quadratic curve to the pixels. Instead of fitting 2 curves separately, I made use of the prior knowledge that the lanes are almost parallel to each other and estimate them together, i.e. constraining the quadratic and the linear coefficients to be them same, only allowing for the intercept to changes between the two curve.
+
+The fitting is implemented in the function `fit_lane()` in the 15th code cell of the Jupyter notebook "lane-tracking.ipynb".
+
+![slidding windows][slidding_windows]
 
 ![alt text][image5]
 
