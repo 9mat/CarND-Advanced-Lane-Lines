@@ -27,6 +27,7 @@ The goals / steps of this project are the following:
 [output]: ./output_images/output.jpg "Fit Visual"
 [video1]: ./project_video.mp4 "Video"
 
+
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 ###Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
 
@@ -272,7 +273,12 @@ This function also draws the output from the intermediate steps of the pipeline 
 
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](http://www.youtube.com/watch?v=F8pqSywS6Iw)
+
+[![Video](http://img.youtube.com/vi/F8pqSywS6Iw/0.jpg)](http://www.youtube.com/watch?v=F8pqSywS6Iw "Video Title")
+
+Here is the result on the challenge video
+[![Video](http://img.youtube.com/vi/vBnTaBC2iJU/0.jpg)](http://www.youtube.com/watch?v=vBnTaBC2iJU "Video Title")
 
 ---
 
