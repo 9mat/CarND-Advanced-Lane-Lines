@@ -287,5 +287,16 @@ Here's a [link to my video result](http://www.youtube.com/watch?v=F8pqSywS6Iw)
 
 ####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+There are still many cases when the pipeline has difficuties:
+* Overexposure to sunlinght make it very difficult for the L-channel to identify white lane
+* Grass or leaves on the side with similar shades of yellow can be falsely detected by the UV channel
+* Uneven color of the surface can create noises in the gradient, resulting in a lot of false positive detected by Sobel X
+* Flares from the front glasses and from other objects can also create false positives in detecting lane pixels
+* Upward and downward slopes can change the plane on which the road lie, impairing the accuracy of the perspective transformation
+* Other vehicle and objects on the road can obstruct the view to the lanes, as well as creating false positive in terms of edge and color detection
+
+More could be done:
+* Adaptive thresholds could be employed to response to different condition in lighting, i.e. threshold to detect white in shadows and/or low-light condition could be set lower than under abundance of sunlight. Histogram equalization could help as well
+* More sophisticated logic to combine different thresholds, e.g. under shadows, edge detection seems to work better then color detection
+* Detect and eliminate other lines: very often we have other lines that run parallel to the lanes (e.g. other lanes, the edge of the road, a mark of the road), sliding windows some can mistake these lines as the main lanes and bias the curve fitting. tracing these lines can help eliminate them and improve the robustness of the pipeline
 
