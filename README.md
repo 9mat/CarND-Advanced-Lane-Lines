@@ -25,7 +25,8 @@ The goals / steps of this project are the following:
 [slidding_windows]: ./output_images/slidding_windows.jpg "Sliding window"
 [fitted_lanes]: ./output_images/fitted_lanes.jpg "Fitted lanes"
 [output]: ./output_images/output.jpg "Fit Visual"
-[video1]: ./project_video.mp4 "Video"
+[video1]: ./project_video_annotated.mp4 "Video"
+[video2]: ./challenge_video_annotated.mp4 "Video"
 
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
@@ -273,11 +274,11 @@ This function also draws the output from the intermediate steps of the pipeline 
 
 ####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](http://www.youtube.com/watch?v=F8pqSywS6Iw)
+Here's a [link to my video result](http://www.youtube.com/watch?v=F8pqSywS6Iw "Video Title") (The video can also be found in the project folder under the name of [***project_video_annotated.mp4***](./project_video_annotated.mp4)).
 
 [![Video](http://img.youtube.com/vi/F8pqSywS6Iw/0.jpg)](http://www.youtube.com/watch?v=F8pqSywS6Iw "Video Title")
 
-[Here](http://www.youtube.com/watch?v=vBnTaBC2iJU) is the result on the challenge video
+[Here](http://www.youtube.com/watch?v=vBnTaBC2iJU) is the result on the challenge video (The video can also be found in the project folder under the name of [***challenge_video_annotated.mp4***](./challenge_video_annotated.mp4)).
 
 [![Video](http://img.youtube.com/vi/vBnTaBC2iJU/0.jpg)](http://www.youtube.com/watch?v=vBnTaBC2iJU "Video Title")
 
