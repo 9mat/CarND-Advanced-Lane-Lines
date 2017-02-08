@@ -72,8 +72,40 @@ I apply this distortion correction to the test image obtained this result:
 I apply the same distortion correction above on the road images from the test folder and obtain results in the following figure.
 ![Distortion correction roads][undistorted_roads]
 ####2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
 
+I used a combination of color and gradient thresholds to generate a binary image, The implementation is coded in the function `pipeline()` in the 7th code cell in the Jupyter notebook "lane-tracking.ipynb".
+
+```python
+def pipeline(img, sx_thresh=30, sl_thresh=200, suv_thresh = 100):
+    # Apply gaussian blur to reduce noise
+    img = gaussian_blur(img)
+
+    # Convert to YUV and use U and V to detect yellow
+    y,u,v = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2YUV))
+    uv = np.abs(u.astype(np.int32) - v.astype(np.int32))*3
+    
+    # Convert to HSL and use L to detect white
+    h,l,s = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HLS))
+    l = clahe.apply(l)
+    
+    # Gradient
+    sobelx = np.absolute(cv2.Sobel(l, cv2.CV_64F, 1, 0, ksize=3)) # Take the derivative in x
+    
+    mask_sx = scaled(sobelx) > sx_thresh
+    mask_white = (l>sl_thresh)
+    mask_yellow = (uv>suv_thresh)
+    
+    # Stack all 3 thresholds together
+    color_binary = np.dstack((mask_yellow, mask_white, mask_sx))
+    return color_binary
+```
+I used UV channel from YUV color space, the L channel from HLS color space and the gradient in the x-direction to create the thresholded binary image.
+
+The choice of the color space is the result of a long process of trials and errors. The UV channel performs very well in detecting yellow. The L channel is very robust in detecting white. I use these two channels instead of the saturation (S from HLS) because, even though S is very good in detecting both white and yellow, it underperforms in each of the two colors compared to each of the aforementioned color channel, especially when the road is overexposed to sunlight. The Sobel X transform is used to make sure the pipeline detecting edges even when there are shadows that may change the shades of yellow and white of the lane marks.
+
+I also apply Gaussian blur to the bottom half of the image to reduce noise, and apply local brightness historam equalization to the lightness channel to enhance constrast. 
+
+The following figure show the result of the pipeline, together with the immediate steps (color/gradient transformation and thresholding)
 ![Pipeline][pipeline]
 
 ####3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
