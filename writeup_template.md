@@ -24,6 +24,7 @@ The goals / steps of this project are the following:
 [pipeline_warp]: ./output_images/pipline_and_warp.jpg "Fit Visual"
 [slidding_windows]: ./output_images/slidding_windows.jpg "Output"
 [fitted_lanes]: ./output_images/fitted_lanes.jpg "Output"
+[output]: ./output_images/output.jpg "Output"
 [video1]: ./project_video.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
@@ -193,20 +194,75 @@ If lanes have been detected in the previous frame, I will use them as reference 
 After obtaining the potential lane pixels, I used regression to fit a quadratic curve to the pixels. Instead of fitting 2 curves separately, I made use of the prior knowledge that the lanes are almost parallel to each other and estimate them together, i.e. constraining the quadratic and the linear coefficients to be them same, only allowing for the intercept to changes between the two curve.
 
 The fitting is implemented in the function `fit_lane()` in the 15th code cell of the Jupyter notebook "lane-tracking.ipynb".
+```python
+def fit_lane(lefty, leftx, righty, rightx, leftw, rightw, img_height, img_width):
 
+    def make_feature(y,right):
+        yy = y - img_height # recenter y
+        polynomial = yy**np.arange(1,3).reshape(-1,1)
+        dv_right = right*np.ones_like(yy)
+        interaction = dv_right*(yy**2)
+        return np.vstack([polynomial, dv_right]).transpose()
+    
+    features_left = make_feature(lefty, False)
+    features_right = make_feature(righty, True)
+    
+    features = np.vstack([features_left, features_right])
+    output = np.hstack([leftx, rightx])
+    weight = np.hstack([leftw*lefty, rightw*righty])
+        
+    if len(features) < 20:
+        return None, None, (None, None, None)
+    
+    regr=linear_model.LinearRegression()
+    regr.fit(features, output, weight)
+        
+    fity = np.arange(img_height)
+    
+    fit_features_left = make_feature(fity, False)
+    fit_features_right = make_feature(fity, True)
+
+    fit_leftx = regr.predict(fit_features_left)
+    fit_rightx = regr.predict(fit_features_right)
+    
+    return regr, make_feature, (fity, fit_leftx, fit_rightx)
+```
+
+The result from the slidding window method and from the using previous fitted lines method are shown below
 ![slidding windows][slidding_windows]
-
-![alt text][image5]
+![fit from previous lines][fitted_lanes]
 
 ####5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `my_other_file.py`
+First, I mannually meaure the width of the lanes in pixels, and the number of dash lines and gap in the birdeye view image. Base on those numbers I calculated the scaling factor (meter per each pixel) as `ym_per_pix = 3*17/720` and `xm_per_pix = 3.7/(960-320)`
+
+The calculation for the radius of curvation is done in the 21st code cell in the Jupyter notebook "lane-tracking.ipynb". As the pixels obtained from the top half are often noisy, I only used the bottom half of the line to calculate the lane curvature.
+
+```python
+def radius_of_curvature(fity, fitx):
+    # Fit new polynomials to x,y in world space
+    y = fity - len(fity)
+    x = fitx - fitx.mean()
+    a,b,c = np.polyfit(y[-100:]*ym_per_pix, x[-100:]*xm_per_pix, 2)
+    return ((1 + b**2)**1.5)/(2*a)
+```
 
 ####6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+I implemented this step in the 21st code cell in the Jupyter notebook "lane-tracking.ipynb" in the function `stitch()`. This function draw the fitted lanes and the lane pixels in the birdeye onto a blank image `color_warp`, and warp it back to the normal view and overlay it onto the orignal image (after distortion correction). The main logic of the function is implemented as follows:
 
-![alt text][image6]
+```python
+    # Warp the blank back to original image space using inverse perspective matrix (Minv)
+    newwarp = cv2.warpPerspective(color_warp, Minv, (img.shape[1], img.shape[0])) 
+    result = img.copy()
+    
+    # draw an arrow to indicate the center of the car
+    cv2.arrowedLine(result, (img.shape[1]//2,img.shape[0]), (img.shape[1]//2,img.shape[0]*2//3), [0,200,200], 7,tipLength=0.1)
+    result = cv2.addWeighted(result, 0.9, newwarp, 0.6, 0)
+    highlighted_birdeye_img = cv2.addWeighted(birdeye_img, 1, color_warp, 0.3, 0)
+```
+This function also draws the output from the intermediate steps of the pipeline side by side to the final output image. The following figure is an example of the output of this function.
+![Output][output]
 
 ---
 
